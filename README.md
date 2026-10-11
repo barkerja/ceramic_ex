@@ -24,6 +24,16 @@ response.result.results  # [%Ceramic.SearchResponse.Item{title: ..., url: ..., d
 
 `Ceramic.search!/3` raises `Ceramic.Error` instead of returning an error tuple.
 
+Per-request overrides apply to one call and leave the client unchanged:
+
+```elixir
+Ceramic.search(client, query,
+  timeout: 10_000,
+  extra_headers: %{"x-request-source" => "cron"},
+  extra_body: %{"experimental" => true}
+)
+```
+
 ## Errors
 
 Every failure is a `%Ceramic.Error{}`. Match on `kind` and `status`:

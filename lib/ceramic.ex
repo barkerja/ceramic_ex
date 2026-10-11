@@ -51,6 +51,10 @@ defmodule Ceramic do
   Searches the web. `query` must contain 1 to 50 whitespace-separated words.
 
   Options: `:max_results` (1..50), `:max_description_length`.
+
+  Per-request overrides, applied to this call only: `:timeout` (receive timeout in ms),
+  `:extra_headers` (map or keyword list), and `:extra_body` (map merged over the JSON body,
+  extra values win).
   """
   @spec search(client(), String.t(), keyword()) ::
           {:ok, SearchResponse.t()} | {:error, Error.t()}
@@ -59,7 +63,7 @@ defmodule Ceramic do
 
     with :ok <- validate_query(query),
          :ok <- validate_max_results(max_results),
-         {:ok, body} <- post_search(client, query, max_results, opts[:max_description_length]) do
+         {:ok, body} <- post_search(client, query, opts) do
       {:ok, SearchResponse.from_map(body)}
     end
   end
@@ -73,17 +77,27 @@ defmodule Ceramic do
     end
   end
 
-  defp post_search(client, query, max_results, max_description_length) do
+  defp post_search(client, query, opts) do
     body =
       %{
         "query" => query,
-        "maxResults" => max_results,
-        "maxDescriptionLength" => max_description_length
+        "maxResults" => opts[:max_results],
+        "maxDescriptionLength" => opts[:max_description_length]
       }
       |> Enum.reject(fn {_k, v} -> is_nil(v) end)
       |> Map.new()
+      |> Map.merge(Map.new(opts[:extra_body] || %{}))
 
-    case Req.post(client, url: "/search", json: body) do
+    request_opts =
+      [
+        url: "/search",
+        json: body,
+        headers: opts[:extra_headers],
+        receive_timeout: opts[:timeout]
+      ]
+      |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+
+    case Req.post(client, request_opts) do
       {:ok, %Req.Response{status: status, body: body}} when status in 200..299 and is_map(body) ->
         {:ok, body}
 

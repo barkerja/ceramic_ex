@@ -94,6 +94,50 @@ defmodule CeramicTest do
              Ceramic.search(client(redirect: false), "moved")
   end
 
+  test "extra_headers are sent with the request" do
+    Req.Test.expect(__MODULE__, fn conn ->
+      assert Plug.Conn.get_req_header(conn, "x-custom") == ["yes"]
+      assert Plug.Conn.get_req_header(conn, "authorization") == ["Bearer test-key"]
+      Req.Test.json(conn, @response)
+    end)
+
+    assert {:ok, _} = Ceramic.search(client(), "headers", extra_headers: %{"x-custom" => "yes"})
+  end
+
+  test "extra_body is merged over the JSON body and wins on conflict" do
+    Req.Test.expect(__MODULE__, fn conn ->
+      {:ok, body, conn} = Plug.Conn.read_body(conn)
+      assert Jason.decode!(body) == %{"query" => "body", "maxResults" => 9, "foo" => "bar"}
+      Req.Test.json(conn, @response)
+    end)
+
+    assert {:ok, _} =
+             Ceramic.search(client(), "body",
+               max_results: 5,
+               extra_body: %{"maxResults" => 9, "foo" => "bar"}
+             )
+  end
+
+  defmodule CapturingAdapter do
+    def run(request) do
+      send(request.options.test_pid, {:request, request})
+      {request, Req.Response.new(status: 200, body: %{"requestId" => "req_123", "result" => %{}})}
+    end
+  end
+
+  test "timeout overrides the receive timeout for that call only" do
+    client =
+      Ceramic.new(api_key: "k", timeout: 60_000)
+      |> Req.Request.register_options([:test_pid])
+      |> Req.merge(adapter: CapturingAdapter, test_pid: self())
+
+    assert {:ok, _} = Ceramic.search(client, "fast", timeout: 1_234)
+    assert_receive {:request, %Req.Request{options: %{receive_timeout: 1_234}}}
+
+    assert {:ok, _} = Ceramic.search(client, "default")
+    assert_receive {:request, %Req.Request{options: %{receive_timeout: 60_000}}}
+  end
+
   test "validation errors are returned before any request is sent" do
     assert {:error, %Ceramic.Error{kind: :validation}} =
              Ceramic.search(client(), String.duplicate("word ", 51))
