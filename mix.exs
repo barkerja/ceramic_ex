@@ -40,14 +40,14 @@ defmodule Ceramic.MixProject do
         "GitHub" => @source_url,
         "API Reference" => "https://docs.ceramic.ai/api-reference/search"
       },
-      files: ~w(lib mix.exs README.md LICENSE .formatter.exs)
+      files: ~w(lib mix.exs README.md CHANGELOG.md LICENSE .formatter.exs)
     ]
   end
 
   defp docs do
     [
       main: "readme",
-      extras: ["README.md"],
+      extras: ["README.md", "CHANGELOG.md"],
       source_url: @source_url,
       source_ref: "v#{@version}",
       groups_for_modules: [
