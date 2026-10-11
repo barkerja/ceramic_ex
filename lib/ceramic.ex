@@ -53,8 +53,8 @@ defmodule Ceramic do
   Options: `:max_results` (1..50), `:max_description_length`.
 
   Per-request overrides, applied to this call only: `:timeout` (receive timeout in ms),
-  `:extra_headers` (map or keyword list), and `:extra_body` (map merged over the JSON body,
-  extra values win).
+  `:extra_headers` (map or keyword list), `:extra_query` (map or keyword list of query
+  params), and `:extra_body` (map merged over the JSON body, extra values win).
   """
   @spec search(client(), String.t(), keyword()) ::
           {:ok, SearchResponse.t()} | {:error, Error.t()}
@@ -93,6 +93,7 @@ defmodule Ceramic do
         url: "/search",
         json: body,
         headers: opts[:extra_headers],
+        params: opts[:extra_query],
         receive_timeout: opts[:timeout]
       ]
       |> Enum.reject(fn {_k, v} -> is_nil(v) end)

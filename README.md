@@ -30,6 +30,7 @@ Per-request overrides apply to one call and leave the client unchanged:
 Ceramic.search(client, query,
   timeout: 10_000,
   extra_headers: %{"x-request-source" => "cron"},
+  extra_query: %{"debug" => 1},
   extra_body: %{"experimental" => true}
 )
 ```

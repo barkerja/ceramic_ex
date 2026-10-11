@@ -104,6 +104,17 @@ defmodule CeramicTest do
     assert {:ok, _} = Ceramic.search(client(), "headers", extra_headers: %{"x-custom" => "yes"})
   end
 
+  test "extra_query is appended to the request URL" do
+    Req.Test.expect(__MODULE__, fn conn ->
+      assert conn.request_path == "/search"
+      assert URI.decode_query(conn.query_string) == %{"debug" => "1", "region" => "us"}
+      Req.Test.json(conn, @response)
+    end)
+
+    assert {:ok, _} =
+             Ceramic.search(client(), "query params", extra_query: %{debug: 1, region: "us"})
+  end
+
   test "extra_body is merged over the JSON body and wins on conflict" do
     Req.Test.expect(__MODULE__, fn conn ->
       {:ok, body, conn} = Plug.Conn.read_body(conn)
