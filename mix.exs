@@ -2,6 +2,7 @@ defmodule Ceramic.MixProject do
   use Mix.Project
 
   @version "0.1.0"
+  @source_url "https://github.com/barkerja/ceramic_ex"
 
   def project do
     [
@@ -12,6 +13,7 @@ defmodule Ceramic.MixProject do
       deps: deps(),
       name: "Ceramic",
       description: "Elixir client for the Ceramic web search API, built on Req",
+      source_url: @source_url,
       package: package(),
       docs: docs()
     ]
@@ -34,7 +36,10 @@ defmodule Ceramic.MixProject do
   defp package do
     [
       licenses: ["Apache-2.0"],
-      links: %{"API Reference" => "https://docs.ceramic.ai/api-reference/search"},
+      links: %{
+        "GitHub" => @source_url,
+        "API Reference" => "https://docs.ceramic.ai/api-reference/search"
+      },
       files: ~w(lib mix.exs README.md LICENSE .formatter.exs)
     ]
   end
@@ -43,6 +48,7 @@ defmodule Ceramic.MixProject do
     [
       main: "readme",
       extras: ["README.md"],
+      source_url: @source_url,
       source_ref: "v#{@version}",
       groups_for_modules: [
         Responses: [
