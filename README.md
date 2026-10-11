@@ -12,6 +12,8 @@ def deps do
 end
 ```
 
+Full documentation is on [hexdocs.pm/ceramic](https://hexdocs.pm/ceramic).
+
 ## Usage
 
 ```elixir
