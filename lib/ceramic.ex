@@ -11,17 +11,20 @@ defmodule Ceramic do
   alias Ceramic.{Error, SearchResponse}
 
   @default_base_url "https://api.ceramic.ai/"
-  @max_query_words 50
+  @query_words_range 1..50
   @max_results_range 1..50
 
   @type client :: Req.Request.t()
 
   @doc """
-  Builds a client. Extra options are passed to `Req.new/1`, so `:plug`, `:retry_delay`
-  and friends can be overridden.
+  Builds a client. `new/1` passes extra options to `Req.new/1`, so you can override
+  `:plug`, `:retry_delay`, and any other Req option.
 
   Options: `:api_key`, `:base_url`, `:timeout` (receive timeout in ms, default 60_000),
   `:max_retries` (default 2).
+
+  Raises `Ceramic.Error` with `kind: :validation` when no API key is given and
+  `CERAMIC_API_KEY` is unset.
   """
   @spec new(keyword()) :: client()
   def new(opts \\ []) do
@@ -31,20 +34,22 @@ defmodule Ceramic do
     {max_retries, opts} = Keyword.pop(opts, :max_retries, 2)
 
     api_key ||
-      raise ArgumentError,
-            "The api_key client option must be set either by passing api_key to the client " <>
-              "or by setting the CERAMIC_API_KEY environment variable"
+      raise Error.validation(
+              "The api_key client option must be set either by passing api_key to the client " <>
+                "or by setting the CERAMIC_API_KEY environment variable"
+            )
 
     [
       base_url: base_url || @default_base_url,
-      auth: {:bearer, api_key},
+      headers: [authorization: "Bearer " <> api_key],
       receive_timeout: timeout,
       connect_options: [timeout: 5_000],
       max_retries: max_retries,
-      retry: &should_retry?/2
+      retry: &should_retry?/2,
+      decode_body: false
     ]
-    |> Keyword.merge(opts)
     |> Req.new()
+    |> Req.merge(opts)
   end
 
   @doc """
@@ -53,16 +58,18 @@ defmodule Ceramic do
   Options: `:max_results` (1..50), `:max_description_length`.
 
   Per-request overrides, applied to this call only: `:timeout` (receive timeout in ms),
-  `:extra_headers` (map or keyword list), `:extra_query` (map or keyword list of query
-  params), and `:extra_body` (map merged over the JSON body, extra values win).
+  `:extra_headers` (map or keyword list, wins over client headers including
+  `authorization`), `:extra_query` (map or keyword list of query params), and
+  `:extra_body` (map merged over the JSON body, extra values win).
+
+  For response headers or the raw `Req.Response`, call `Req.post(client, url: "/search",
+  json: body)` directly.
   """
   @spec search(client(), String.t(), keyword()) ::
           {:ok, SearchResponse.t()} | {:error, Error.t()}
   def search(client, query, opts \\ []) do
-    max_results = opts[:max_results]
-
     with :ok <- validate_query(query),
-         :ok <- validate_max_results(max_results),
+         :ok <- validate_max_results(opts[:max_results]),
          {:ok, body} <- post_search(client, query, opts) do
       {:ok, SearchResponse.from_map(body)}
     end
@@ -84,42 +91,54 @@ defmodule Ceramic do
         "maxResults" => opts[:max_results],
         "maxDescriptionLength" => opts[:max_description_length]
       }
-      |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+      |> drop_nils()
       |> Map.new()
       |> Map.merge(Map.new(opts[:extra_body] || %{}))
 
     request_opts =
-      [
+      drop_nils(
         url: "/search",
         json: body,
         headers: opts[:extra_headers],
         params: opts[:extra_query],
         receive_timeout: opts[:timeout]
-      ]
-      |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+      )
 
     case Req.post(client, request_opts) do
-      {:ok, %Req.Response{status: status, body: body}} when status in 200..299 and is_map(body) ->
-        {:ok, body}
-
-      {:ok, %Req.Response{status: status} = response} when status in 200..299 ->
-        {:error, Error.invalid_response(response)}
-
-      {:ok, %Req.Response{} = response} ->
-        {:error, Error.from_response(response)}
-
-      {:error, exception} ->
-        {:error, Error.from_exception(exception)}
+      {:ok, %Req.Response{status: status, body: raw}} -> handle_response(status, decode(raw))
+      {:error, exception} -> {:error, Error.from_exception(exception)}
     end
   end
 
+  defp handle_response(status, body) when status in 200..299 and is_map(body), do: {:ok, body}
+
+  defp handle_response(status, body) when status in 200..299,
+    do: {:error, Error.invalid_response(status, body)}
+
+  defp handle_response(status, body), do: {:error, Error.api_status(status, body)}
+
+  defp decode(raw) when is_binary(raw) do
+    case JSON.decode(raw) do
+      {:ok, decoded} -> decoded
+      {:error, _} -> raw
+    end
+  end
+
+  defp decode(raw), do: raw
+
+  defp drop_nils(enum), do: Enum.reject(enum, fn {_k, v} -> is_nil(v) end)
+
   defp validate_query(query) when is_binary(query) do
     case length(String.split(query)) do
-      n when n in 1..@max_query_words ->
+      n when n in @query_words_range ->
         :ok
 
       n ->
-        {:error, Error.validation("Invalid `query`: expected between 1 and 50 words, got #{n}.")}
+        {:error,
+         Error.validation(
+           "Invalid `query`: expected between #{@query_words_range.first} and " <>
+             "#{@query_words_range.last} words, got #{n}."
+         )}
     end
   end
 
@@ -130,8 +149,11 @@ defmodule Ceramic do
     do:
       {:error,
        Error.validation(
-         "Invalid `max_results`: expected an integer between 1 and 50, got #{inspect(n)}."
+         "Invalid `max_results`: expected an integer between #{@max_results_range.first} " <>
+           "and #{@max_results_range.last}, got #{inspect(n)}."
        )}
+
+  defp should_retry?(_request, %Req.Response{status: status}) when status in 200..299, do: false
 
   defp should_retry?(_request, %Req.Response{status: status} = response) do
     case Req.Response.get_header(response, "x-should-retry") do
@@ -142,57 +164,10 @@ defmodule Ceramic do
   end
 
   defp should_retry?(_request, %Req.TransportError{}), do: true
+
+  defp should_retry?(_request, %Req.HTTPError{protocol: :http2, reason: reason})
+       when reason in [:unprocessed, :pool_not_available],
+       do: true
+
   defp should_retry?(_request, %{__exception__: true}), do: false
-end
-
-defmodule Ceramic.Error do
-  @moduledoc """
-  Raised or returned for every failure. Match on `kind` and `status`:
-
-      {:error, %Ceramic.Error{kind: :api_status, status: 401, body: %{"code" => code}}}
-
-  `kind` is `:validation` (rejected before sending), `:api_status` (any non-2xx),
-  `:invalid_response` (2xx whose body is not a JSON object), `:timeout`, or `:connection`.
-  `body` is the decoded JSON error body when the API returned one.
-  """
-
-  defexception [:message, :kind, :status, :body]
-
-  @type t :: %__MODULE__{
-          message: String.t(),
-          kind: :validation | :api_status | :invalid_response | :timeout | :connection,
-          status: pos_integer() | nil,
-          body: term()
-        }
-
-  def validation(message), do: %__MODULE__{kind: :validation, message: message}
-
-  def from_response(%Req.Response{status: status, body: body}) do
-    message =
-      case body do
-        "" -> "Error code: #{status}"
-        text when is_binary(text) -> text
-        decoded -> "Error code: #{status} - #{inspect(decoded)}"
-      end
-
-    %__MODULE__{kind: :api_status, status: status, body: body, message: message}
-  end
-
-  def invalid_response(%Req.Response{status: status, body: body}) do
-    %__MODULE__{
-      kind: :invalid_response,
-      status: status,
-      body: body,
-      message: "Data returned by API invalid for expected schema."
-    }
-  end
-
-  def from_exception(%Req.TransportError{reason: :timeout}),
-    do: %__MODULE__{kind: :timeout, message: "Request timed out."}
-
-  def from_exception(exception),
-    do: %__MODULE__{
-      kind: :connection,
-      message: "Connection error: " <> Exception.message(exception)
-    }
 end

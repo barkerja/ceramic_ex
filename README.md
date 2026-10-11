@@ -11,7 +11,7 @@ Elixir client for the [Ceramic](https://docs.ceramic.ai/api-reference/search) se
 ```elixir
 def deps do
   [
-    {:ceramic, "~> 0.1.2"}
+    {:ceramic, "~> 0.1"}
   ]
 end
 ```
@@ -54,9 +54,18 @@ case Ceramic.search(client, query) do
 end
 ```
 
+`Ceramic.new/1` raises `Ceramic.Error` with `kind: :validation` when no API key is available.
+
+For response headers or the raw `Req.Response`, call Req directly with the client. The client disables Req's body decoding, so `body` is the raw JSON string:
+
+```elixir
+{:ok, %Req.Response{status: 200, headers: headers, body: raw_json}} =
+  Req.post(client, url: "/search", json: %{"query" => query})
+```
+
 ## Retries and timeouts
 
-Requests retry twice on 408, 409, 429, 5xx, and connection errors, with backoff of 1s, 2s, 4s. A `Retry-After` header sets the delay and an `x-should-retry` header overrides the decision. The receive timeout is 60s and the connect timeout is 5s.
+Requests retry twice on 408, 409, 429, 5xx, and connection errors, with backoff of 1s, 2s, 4s plus up to 10% jitter. On 429 and 503 a `Retry-After` header sets the delay instead. An `x-should-retry` header on a non-2xx response overrides the decision. The receive timeout is 60s and the connect timeout is 5s.
 
 Override per client: `Ceramic.new(max_retries: 0, timeout: 10_000)`. Any other option goes to `Req.new/1`.
 

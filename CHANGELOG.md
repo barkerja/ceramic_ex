@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- Keep the status and raw text when a non-2xx body is not valid JSON, instead of reporting a connection error
+- Decode JSON bodies by content, not by `Content-Type`, matching the Python SDK
+- Stop retrying 2xx responses that carry `x-should-retry: true`
+- Let `:extra_headers` override the client `authorization` header
+- Raise `Ceramic.Error` with `kind: :validation` instead of `ArgumentError` when no API key is available
+- Retry HTTP/2 `:unprocessed` and `:pool_not_available` transport failures
+- Move `Ceramic.Error` to `lib/ceramic/error.ex` and add typespecs
+- Document how to read response headers through `Req.post/2`
+
 ## v0.1.2 (2026-10-11)
 
 - Add CI, Hex.pm, and hexdocs badges to the README
