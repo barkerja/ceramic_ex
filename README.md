@@ -59,3 +59,7 @@ end
 Requests retry twice on 408, 409, 429, 5xx, and connection errors, with backoff of 1s, 2s, 4s. A `Retry-After` header sets the delay and an `x-should-retry` header overrides the decision. The receive timeout is 60s and the connect timeout is 5s.
 
 Override per client: `Ceramic.new(max_retries: 0, timeout: 10_000)`. Any other option goes to `Req.new/1`.
+
+## License
+
+Apache-2.0. See [LICENSE](LICENSE).
