@@ -1,6 +1,7 @@
 # Ceramic
 
 [![CI](https://github.com/barkerja/ceramic_ex/actions/workflows/ci.yml/badge.svg)](https://github.com/barkerja/ceramic_ex/actions/workflows/ci.yml)
+[![Hex.pm](https://img.shields.io/hexpm/v/ceramic.svg)](https://hex.pm/packages/ceramic)
 
 Elixir client for the [Ceramic](https://docs.ceramic.ai/api-reference/search) search API, built on [Req](https://hex.pm/packages/req).
 
