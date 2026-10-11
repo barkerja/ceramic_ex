@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.1.1 (2026-10-11)
+
+- Ship `CHANGELOG.md` in the Hex package and render it in the docs
+
 ## v0.1.0 (2026-10-11)
 
 Initial release.
