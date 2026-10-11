@@ -11,7 +11,7 @@ Elixir client for the [Ceramic](https://docs.ceramic.ai/api-reference/search) se
 ```elixir
 def deps do
   [
-    {:ceramic, "~> 0.1.1"}
+    {:ceramic, "~> 0.1.2"}
   ]
 end
 ```

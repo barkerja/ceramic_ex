@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.1.2 (2026-10-11)
+
+- Add CI, Hex.pm, and hexdocs badges to the README
+- Add a License section to the README
+
 ## v0.1.1 (2026-10-11)
 
 - Ship `CHANGELOG.md` in the Hex package and render it in the docs
